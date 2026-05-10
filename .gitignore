@@ -29,6 +29,7 @@ dist/
 .cache/
 .srm-cache/
 reports/stress/*cache*.json
+reports/retrieval-quality/*.json
 
 # IDE/editor
 .vscode/

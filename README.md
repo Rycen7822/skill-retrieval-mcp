@@ -9,6 +9,7 @@ It exposes only two agent-facing tools:
 
 Full design: `docs/skill-retrieval-mcp-design.md`.
 Self-audit and verification notes: `docs/SELF_AUDIT.md`.
+Retrieval quality evaluation: `docs/RETRIEVAL_QUALITY_EVAL.md` (180 labelled cases / 50 gold skills with accuracy/precision gates plus entropy, TF-IDF cosine, and MMR novelty diversity gates across direct, paraphrase, noisy, typo, low-budget, environment, multilingual, category, multi-relevant, Hermes Agent, and Codex built-in skill scenarios).
 
 ## Why this exists
 
@@ -47,6 +48,9 @@ uv run srm search \
 uv run srm load github-code-review --view preview --max-tokens 500
 uv run srm bench --iterations 200
 uv run pytest -q
+uv run pytest tests/test_retrieval_quality.py -q
+uv run pytest tests/test_builtin_skill_roots.py -q
+uv run python scripts/evaluate_retrieval_quality.py --json-out reports/retrieval-quality/latest.json
 ```
 
 ## MCP server
