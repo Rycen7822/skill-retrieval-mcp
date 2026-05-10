@@ -313,6 +313,14 @@ class PreparedText:
 
 
 @dataclass(frozen=True)
+class IdentityAlias:
+    kind: str
+    alias: str
+    tokens: tuple[str, ...]
+    pattern: re.Pattern[str]
+
+
+@dataclass(frozen=True)
 class PreparedRecord:
     description: PreparedText
     workflow: PreparedText
@@ -320,11 +328,32 @@ class PreparedRecord:
     metadata: PreparedText
     positive: PreparedText
     negative: PreparedText
+    identity_aliases: tuple[IdentityAlias, ...]
 
 
 def _prepare_text(text: str) -> PreparedText:
     toks = tokenize(text)
     return PreparedText(text=text, lower=text.lower(), counts=Counter(toks), tokens=frozenset(toks))
+
+
+def _prepare_identity_aliases(record: SkillRecord) -> tuple[IdentityAlias, ...]:
+    aliases: list[IdentityAlias] = []
+    seen: set[tuple[str, str]] = set()
+    for kind, value in (("skill_id", record.skill_id), ("name", record.name)):
+        value = value.strip()
+        values = [value]
+        phrase = " ".join(tokenize(value))
+        if phrase and phrase != value.lower():
+            values.append(phrase)
+        for idx, alias in enumerate(values):
+            alias_kind = kind if idx == 0 else kind + "_phrase"
+            key = (alias_kind, alias)
+            if not alias or key in seen:
+                continue
+            seen.add(key)
+            pattern = re.compile(rf"(?<![A-Za-z0-9_:@+.-]){re.escape(alias.lower())}(?![A-Za-z0-9_:@+.-])")
+            aliases.append(IdentityAlias(alias_kind, alias, tuple(tokenize(alias)), pattern))
+    return tuple(aliases)
 
 
 def _prepare_record(record: SkillRecord) -> PreparedRecord:
@@ -338,6 +367,7 @@ def _prepare_record(record: SkillRecord) -> PreparedRecord:
         metadata=_prepare_text(metadata_text),
         positive=_prepare_text(record.positive_text),
         negative=_prepare_text(record.do_not_use_when),
+        identity_aliases=_prepare_identity_aliases(record),
     )
 
 
@@ -346,11 +376,16 @@ def _prepare_query_text(text: str) -> dict[str, Any]:
 
 
 def _prepare_query(request: SearchRequest) -> dict[str, Any]:
+    raw = _prepare_query_text(request.raw_user_request)
+    description = _prepare_query_text(request.description_query)
+    workflow = _prepare_query_text(request.workflow_query)
     return {
-        "description": _prepare_query_text(request.description_query),
-        "workflow": _prepare_query_text(request.workflow_query),
-        "raw": _prepare_query_text(request.raw_user_request),
+        "description": description,
+        "workflow": workflow,
+        "raw": raw,
         "metadata": _prepare_query_text(" ".join(request.environment + request.nice_to_have)),
+        "identity_text": "\n".join([request.raw_user_request, request.description_query, request.workflow_query]).lower(),
+        "identity_tokens": raw["tokens"] + description["tokens"] + workflow["tokens"],
         "must_have": [(cue, tokenize(cue), " ".join(tokenize(cue))) for cue in request.must_have],
         "must_not": [(cue, tokenize(cue), " ".join(tokenize(cue))) for cue in request.must_not],
     }
@@ -376,6 +411,43 @@ def _score_prepared(query: dict[str, Any], prepared: PreparedText) -> tuple[floa
 
 def _score_text(query: str, text: str) -> tuple[float, list[str]]:
     return _score_prepared(_prepare_query_text(query), _prepare_text(text))
+
+
+def _contains_token_phrase(tokens: list[str], phrase_tokens: list[str]) -> bool:
+    if not tokens or not phrase_tokens or len(phrase_tokens) > len(tokens):
+        return False
+    width = len(phrase_tokens)
+    return any(tokens[idx:idx + width] == phrase_tokens for idx in range(len(tokens) - width + 1))
+
+
+def _identity_match(prep: PreparedRecord, qprep: dict[str, Any]) -> tuple[float, list[str]]:
+    """Return an exact skill-identity boost and human-readable matches.
+
+    Stress testing showed that rich neighboring skills such as github-issues can
+    outrank github-repo-management even when the query explicitly names the
+    target skill. This boost is deliberately exact and bounded: full multi-token
+    ids/names receive a stronger boost; single-token router names receive only a
+    small boost so they do not dominate specific hyphenated skill ids.
+    """
+    query_text = qprep["identity_text"]
+    query_tokens = qprep["identity_tokens"]
+    best = 0.0
+    matches: list[str] = []
+    for alias in prep.identity_aliases:
+        if not alias.tokens:
+            continue
+        exact_text = bool(alias.pattern.search(query_text))
+        phrase_text = _contains_token_phrase(query_tokens, list(alias.tokens))
+        if not (exact_text or phrase_text):
+            continue
+        if len(alias.tokens) > 1:
+            bonus = 0.24 if alias.kind in {"skill_id", "name"} and exact_text else 0.18
+        else:
+            bonus = 0.08 if exact_text else 0.04
+        if bonus > best:
+            best = bonus
+        matches.append(f"{alias.kind}={alias.alias}")
+    return best, matches[:4]
 
 
 def _important_phrases(text: str) -> list[str]:
@@ -447,16 +519,29 @@ def _negative_conflict(raw_query: dict[str, Any], negative_text: str) -> tuple[f
 
 
 def _fit_search_budget(response: dict[str, Any], max_tokens: int) -> dict[str, Any]:
-    """Shrink search response while preserving valid JSON and decision fields."""
+    """Shrink search response while preserving valid JSON and decision fields.
+
+    ``tokens_estimate`` is part of the returned JSON, so it must be included in
+    the final size calculation. The stress test uses the minimum accepted budget
+    (200), which requires an explicit final minimal-provenance shape rather than
+    just shortening cards/reasons.
+    """
     original_count = len(response.get("results", []))
     response.setdefault("omitted_results", 0)
 
-    def token_count() -> int:
-        return estimate_tokens(json.dumps(response, ensure_ascii=False, separators=(",", ":")))
+    def stable_token_count(payload: dict[str, Any]) -> int:
+        for _ in range(8):
+            count = estimate_tokens(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+            if payload.get("tokens_estimate") == count:
+                return count
+            payload["tokens_estimate"] = count
+        return estimate_tokens(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
 
-    if token_count() <= max_tokens:
-        response["truncated"] = False
-        response["tokens_estimate"] = token_count()
+    def fits(payload: dict[str, Any]) -> bool:
+        return stable_token_count(payload) <= max_tokens
+
+    response["truncated"] = False
+    if fits(response):
         return response
 
     response["truncated"] = True
@@ -466,41 +551,73 @@ def _fit_search_budget(response: dict[str, Any], max_tokens: int) -> dict[str, A
             card = item.get("card", "")
             if len(card) > card_len:
                 item["card"] = card[: max(0, card_len - 3)].rstrip() + "..."
-        if token_count() <= max_tokens:
-            response["tokens_estimate"] = token_count()
+        if fits(response):
             return response
 
     # Phase 2: keep only the most actionable reasons.
     for item in response.get("results", []):
         item["why_match"] = item.get("why_match", [])[:2]
         item["why_maybe_not"] = item.get("why_maybe_not", [])[:2]
-    if token_count() <= max_tokens:
-        response["tokens_estimate"] = token_count()
+    if fits(response):
         return response
 
     # Phase 3: reduce candidate count. Token budget has priority over requested k.
-    while len(response.get("results", [])) > 1 and token_count() > max_tokens:
+    while len(response.get("results", [])) > 1 and not fits(response):
         response["results"].pop()
         response["omitted_results"] = original_count - len(response["results"])
-    if token_count() <= max_tokens:
-        response["tokens_estimate"] = token_count()
+    if fits(response):
         return response
 
-    # Phase 4: ultra-compact single-candidate mode. Load provides full provenance.
+    # Phase 4: ultra-compact single-candidate mode. Keep full source_sha256;
+    # dropping or renaming provenance is worse than dropping verbose card/reasons.
     for item in response.get("results", []):
-        if len(item.get("card", "")) > 48:
-            item["card"] = item["card"][:45].rstrip() + "..."
-        item["why_match"] = item.get("why_match", [])[:1]
-        item["why_maybe_not"] = item.get("why_maybe_not", [])[:1]
-        item["risk_flags"] = item.get("risk_flags", [])[:4]
+        item.pop("card", None)
         item.pop("source_path", None)
-        if len(item.get("source_sha256", "")) > 16:
-            item["source_sha256"] = item["source_sha256"][:16]
+        item.pop("risk_flags", None)
+        item.pop("why_match", None)
+        item.pop("why_maybe_not", None)
+        item.pop("matched_fields", None)
+        if not item.get("missing_requirements"):
+            item.pop("missing_requirements", None)
         item["provenance_truncated"] = True
     if "ambiguity" in response:
-        response["ambiguity"]["reason"] = "ambiguous; preview before runtime" if response["ambiguity"].get("is_ambiguous") else "clear top candidate"
-    response["tokens_estimate"] = token_count()
-    return response
+        response["ambiguity"].pop("reason", None)
+    if fits(response):
+        return response
+
+    # Phase 5: hard-budget fallback. Preserve one loadable candidate and full
+    # source hash, then omit nonessential top-level diagnostics.
+    compact_results: list[dict[str, Any]] = []
+    for item in response.get("results", [])[:1]:
+        compact_item = {
+            "handle": item.get("handle"),
+            "skill_id": item.get("skill_id"),
+            "score": item.get("score"),
+            "confidence": item.get("confidence"),
+            "load_decision": item.get("load_decision"),
+            "recommended_view": item.get("recommended_view"),
+            "source_sha256": item.get("source_sha256"),
+        }
+        if item.get("missing_requirements"):
+            compact_item["missing_requirements"] = item["missing_requirements"][:2]
+        compact_results.append({k: v for k, v in compact_item.items() if v not in (None, [], "")})
+    compact_response = {
+        "query_id": response.get("query_id"),
+        "confidence": response.get("confidence"),
+        "results": compact_results,
+        "truncated": True,
+        "omitted_results": original_count - len(compact_results),
+        "total_indexed": response.get("total_indexed"),
+    }
+    if fits(compact_response):
+        return compact_response
+
+    # Last resort for pathological long ids/handles: canonical skill_id remains
+    # enough for skill_load, so handle can be omitted to keep the response valid.
+    for item in compact_response.get("results", []):
+        item.pop("handle", None)
+    fits(compact_response)
+    return compact_response
 
 
 class SkillRetrievalEngine:
@@ -629,9 +746,7 @@ class SkillRetrievalEngine:
         if raw in self._handles:
             return self._handles[raw]
         if raw.startswith("search:"):
-            parts = raw.split(":", 3)
-            if len(parts) == 4 and parts[3] in self._by_id:
-                return parts[3]
+            raise KeyError(f"Unknown or expired skill search handle: {raw!r}. Use a handle returned by this skill_search session or pass a canonical skill_id.")
         if not SAFE_ID_RE.match(raw):
             raise KeyError(f"Unknown skill handle/id: {raw!r}. Use a skill_id or handle returned by skill_search.")
         if raw not in self._by_id:
@@ -645,8 +760,13 @@ class SkillRetrievalEngine:
         metadata_score, meta_matches = _score_prepared(qprep["metadata"], prep.metadata)
         trust_score = 1.0 if record.trust_level in {"user-hermes", "local-root"} else 0.5
         score = 0.40 * desc_score + 0.30 * workflow_score + 0.15 * raw_score + 0.10 * metadata_score + 0.05 * trust_score
+        identity_bonus, identity_matches = _identity_match(prep, qprep)
+        score += identity_bonus
         why_match: list[str] = []
         matched_fields: set[str] = set()
+        if identity_matches:
+            matched_fields.add("identity")
+            why_match.append("identity matched: " + ", ".join(identity_matches))
         if desc_matches:
             matched_fields.add("description")
             why_match.append("description/card matched: " + ", ".join(desc_matches[:8]))

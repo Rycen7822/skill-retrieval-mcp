@@ -28,6 +28,7 @@ dist/
 *.tmp
 .cache/
 .srm-cache/
+reports/stress/*cache*.json
 
 # IDE/editor
 .vscode/

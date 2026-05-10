@@ -24,8 +24,15 @@ The intended flow is:
 ## Install / sync
 
 ```bash
-cd /home/xu/project/tools/SRM
+cd /home/xu/project/tools/skill-retrieval-mcp
 uv sync --extra dev
+```
+
+If this project directory is moved or renamed, refresh uv's virtualenv metadata and console-script shebangs before running MCP stdio tests:
+
+```bash
+uv venv --allow-existing --prompt skill-retrieval-mcp
+uv sync --extra dev --reinstall
 ```
 
 ## CLI smoke checks
@@ -53,7 +60,7 @@ Example local client config:
   "mcpServers": {
     "skill-retrieval": {
       "command": "uv",
-      "args": ["run", "--project", "/home/xu/project/tools/SRM", "skill-retrieval-mcp"],
+      "args": ["run", "--project", "/home/xu/project/tools/skill-retrieval-mcp", "skill-retrieval-mcp"],
       "env": {
         "SRM_SKILL_ROOTS": "/home/xu/.hermes/skills"
       }
