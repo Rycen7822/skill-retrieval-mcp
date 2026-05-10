@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "skill-retrieval": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "/home/xu/project/tools/SRM",
+        "skill-retrieval-mcp"
+      ],
+      "env": {
+        "SRM_SKILL_ROOTS": "/home/xu/.hermes/skills"
+      }
+    }
+  }
+}

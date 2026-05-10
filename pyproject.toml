@@ -1,0 +1,32 @@
+[project]
+name = "skill-retrieval-mcp"
+version = "0.1.0"
+description = "High-performance Skill Retrieval MCP with dual-query skill selection and lazy loading."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "mcp>=1.21.0",
+  "pydantic>=2.8.0",
+  "PyYAML>=6.0.2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+]
+
+[project.scripts]
+skill-retrieval-mcp = "skill_retrieval_mcp.server:main"
+srm = "skill_retrieval_mcp.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/skill_retrieval_mcp"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
