@@ -14,7 +14,7 @@ Search short skill cards first, then lazily load only the selected runtime view.
   <a href="README.md"><img src="https://img.shields.io/badge/Docs-README-f5c542?style=for-the-badge" alt="Docs"></a>
   <a href=".mcp.example.json"><img src="https://img.shields.io/badge/MCP-two%20tools-2ea44f?style=for-the-badge" alt="MCP: two tools"></a>
   <a href="rust-version/README.md"><img src="https://img.shields.io/badge/Runtime-Python%20%7C%20Rust-blue?style=for-the-badge" alt="Runtime: Python and Rust"></a>
-  <a href="https://github.com/Rycen7822/skill-retrieval-mcp/releases"><img src="https://img.shields.io/badge/Rust%20Prebuilt-planned-0969da?style=for-the-badge" alt="Rust prebuilt package planned"></a>
+  <a href="https://github.com/Rycen7822/skill-retrieval-mcp/releases"><img src="https://img.shields.io/badge/Rust%20Prebuilt-available-0969da?style=for-the-badge" alt="Rust prebuilt package available"></a>
 </p>
 
 > Skill Retrieval MCP is meant for agent environments with many local skills.
@@ -57,7 +57,7 @@ The intended flow is:
 
 | Variant | Best for | Runtime requirements | Status |
 | --- | --- | --- | --- |
-| Rust prebuilt package | Normal use and distribution on supported hosts | Linux x86_64 package once released | Planned; no package is published yet |
+| Rust prebuilt package | Normal use and distribution on supported hosts | Linux x86_64 release archive | Available as a GitHub release asset |
 | Python version | Editing, debugging, or using the original implementation | Python 3.11+, `uv` | Available |
 | Rust from source | Native local use, development, and platform-specific builds | Rust toolchain | Available |
 
@@ -69,10 +69,10 @@ Default skill root is `~/.hermes/skills`. Override with `SRM_SKILL_ROOTS` using
 Copy the matching prompt into a Codex or other coding agent when you want it to
 install the MCP for itself.
 
-Rust prebuilt package, recommended once release assets exist:
+Rust prebuilt package, recommended on Linux x86_64:
 
 ```text
-Install Skill Retrieval MCP for yourself globally from repo `https://github.com/Rycen7822/skill-retrieval-mcp`. Prefer the Rust prebuilt package if a release asset named like `skill-retrieval-mcp-rust-<version>-<target>.tar.gz` exists; install it under `~/.codex/plugins/skill-retrieval-mcp`, register MCP `skill-retrieval` to `~/.codex/plugins/skill-retrieval-mcp/bin/skill-retrieval-mcp-rust serve`, set `SRM_SKILL_ROOTS` to the local skill library, and verify with `skill-retrieval-mcp-rust --help`, `codex mcp list`, `tools/list`, `skill_search`, and `skill_load`. If no Rust prebuilt asset exists yet, stop and use the Rust-from-source prompt instead.
+Install Skill Retrieval MCP for yourself globally from repo `https://github.com/Rycen7822/skill-retrieval-mcp`. Prefer the latest Rust prebuilt release asset named like `skill-retrieval-mcp-rust-<version>-x86_64-unknown-linux-gnu.tar.gz`; install it under `~/.codex/plugins/skill-retrieval-mcp`, register MCP `skill-retrieval` to `~/.codex/plugins/skill-retrieval-mcp/bin/skill-retrieval-mcp-rust serve`, set `SRM_SKILL_ROOTS` to the local skill library, and verify with `skill-retrieval-mcp-rust --help`, `codex mcp list`, `tools/list`, `skill_search`, and `skill_load`. If the host is not Linux x86_64 or no matching prebuilt asset exists, use the Rust-from-source prompt instead.
 ```
 
 Python version, for editing or debugging the source implementation:
@@ -89,17 +89,16 @@ Build Skill Retrieval MCP from source for your platform by cloning `https://gith
 
 ### Rust Prebuilt Package
 
-No Rust prebuilt package is published yet. This section documents the expected
-install shape so future release assets stay consistent with the other tools in
-this workspace.
+The Rust prebuilt package is published as a GitHub release asset for Linux
+x86_64. Use the source build path below for other targets.
 
-Expected future release asset:
+Release asset shape:
 
 ```text
 https://github.com/Rycen7822/skill-retrieval-mcp/releases/download/v<version>/skill-retrieval-mcp-rust-<version>-<target>.tar.gz
 ```
 
-Expected future install flow:
+Install flow:
 
 ```bash
 mkdir -p ~/.codex/plugins/skill-retrieval-mcp
@@ -109,14 +108,12 @@ tar -xzf skill-retrieval-mcp-rust-<version>-<target>.tar.gz -C ~/.codex/plugins/
 ~/.codex/plugins/skill-retrieval-mcp/bin/skill-retrieval-mcp-rust --help
 ```
 
-Fallback direct MCP registration, once the binary exists:
+Direct MCP registration:
 
 ```bash
 codex mcp add skill-retrieval -- \
   ~/.codex/plugins/skill-retrieval-mcp/bin/skill-retrieval-mcp-rust serve
 ```
-
-Until a prebuilt package is released, use **Rust From Source** below.
 
 ### Python Version
 
@@ -358,4 +355,4 @@ Synthetic regression tests cover 361 skills and enforce:
 - The implementation is local and deterministic by default.
 - It does not download or run embedding models in the hot path.
 - Optional vector backends can be added later as offline index enhancers, but should not replace skill-level gating.
-- Rust prebuilt packaging is intentionally documented before release so future archives keep a stable install shape.
+- Rust prebuilt packaging currently ships a Linux x86_64 archive; use Rust from source for other targets.
