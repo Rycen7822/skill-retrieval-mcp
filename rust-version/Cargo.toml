@@ -1,0 +1,28 @@
+[package]
+name = "skill-retrieval-mcp-rust"
+version = "0.1.0"
+edition = "2024"
+description = "Pure Rust Skill Retrieval MCP with dual-query search and lazy skill loading"
+license = "MIT"
+
+[lib]
+name = "skill_retrieval_mcp_rust"
+path = "src/lib.rs"
+
+[[bin]]
+name = "skill-retrieval-mcp-rust"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+clap = { version = "4.5", features = ["derive"] }
+regex = "1.11"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+sha2 = "0.10"
+walkdir = "2.5"
+
+[dev-dependencies]
+tempfile = "3.16"
