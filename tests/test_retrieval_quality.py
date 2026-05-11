@@ -36,7 +36,7 @@ def test_retrieval_quality_dataset_is_balanced_and_fully_judged() -> None:
     categories = {case.category for case in cases if case.category}
     token_budgets = {case.max_tokens for case in cases}
 
-    assert len(cases) >= 170
+    assert len(cases) >= 500
     assert {
         "direct",
         "paraphrase",
@@ -112,7 +112,7 @@ def test_retrieval_quality_dataset_meets_algorithmic_diversity_gate() -> None:
 
     report = evaluate_case_diversity(cases, near_duplicate_threshold=0.86, mmr_lambda=0.65)
 
-    assert report["case_count"] >= 170
+    assert report["case_count"] >= 500
     assert report["intent_entropy_norm"] >= 0.82
     assert report["language_entropy_norm"] >= 0.50
     assert report["category_entropy_norm"] >= 0.50

@@ -62,9 +62,9 @@ Default quality gates:
 
 ## Design notes
 
-The fixture now contains 180 cases over at least 50 gold skills. It covers the original GitHub/research/note-taking/development set plus additional synthetic skills in productivity-adjacent content processing, data-science, creative writing, user-imported tools, Hermes plugin planning, the `hermes-agent` skill, and Codex built-ins from `$CODEX_HOME/skills` / `.system` plus curated Hugging Face and GitHub plugin skills. The diversity gate in `tests/test_retrieval_quality.py` requires:
+The fixture now contains 500 cases over at least 50 gold skills. It covers the original GitHub/research/note-taking/development set plus additional synthetic skills in productivity-adjacent content processing, data-science, creative writing, user-imported tools, Hermes plugin planning, the `hermes-agent` skill, and Codex built-ins from `$CODEX_HOME/skills` / `.system` plus curated Hugging Face and GitHub plugin skills. The diversity gate in `tests/test_retrieval_quality.py` requires:
 
-- at least 170 cases and 50 gold skills;
+- at least 500 cases and 50 gold skills;
 - direct, paraphrase, Chinese, hard-negative, must-not, category-filter, multi-relevant, noisy-context, typo, low-budget, environment-context, and cross-language intents;
 - English, Chinese, mixed Chinese/English, Japanese-labelled, and Spanish-labelled request surfaces;
 - low and medium token budgets, including budgets at or below 300 tokens;

@@ -9,7 +9,7 @@ It exposes only two agent-facing tools:
 
 Full design: `docs/skill-retrieval-mcp-design.md`.
 Self-audit and verification notes: `docs/SELF_AUDIT.md`.
-Retrieval quality evaluation: `docs/RETRIEVAL_QUALITY_EVAL.md` (180 labelled cases / 50 gold skills with accuracy/precision gates plus entropy, TF-IDF cosine, and MMR novelty diversity gates across direct, paraphrase, noisy, typo, low-budget, environment, multilingual, category, multi-relevant, Hermes Agent, and Codex built-in skill scenarios).
+Retrieval quality evaluation: `docs/RETRIEVAL_QUALITY_EVAL.md` (500 labelled cases / 50 gold skills with accuracy/precision gates plus entropy, TF-IDF cosine, and MMR novelty diversity gates across direct, paraphrase, noisy, typo, low-budget, environment, multilingual, category, multi-relevant, Hermes Agent, and Codex built-in skill scenarios).
 
 ## Why this exists
 
